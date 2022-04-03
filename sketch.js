@@ -3,6 +3,7 @@ let size = []; //range for size selectors
 
 let colour_qty = 7; //pick an odd number - number of colour options
 let weight_qty = 5; //currently can't change from 5
+let sizeState = "large"
 
 let penColour; //master colour of drawing tool
 let penSize = 19; //master size of pen
@@ -15,41 +16,54 @@ var drawingCanvas; //main drawing drawingCanvas
 var welcome; //welcome screen drawingCanvas
 
 let welcomeState = true; //welcome screen state
+let penState = true; // pen state
 let brushState = false; //brush trigger state
 let emojiState = false; //emoji trigger state
-let colourBoxHoverState = false;
-let weightBoxHoverState = false;
-let buttonHoverState = false;
-let penState = true;
+let colourBoxHoverState = false; //Colour picker hover state
+let weightBoxHoverState = false; //Weight picker hover state
+let buttonHoverState = false; // button hover state
 
 let fontRegular, fontBold, fontItalic; //font import
 
-let previousState;
-
+//Used for the undo button - not currently active
+let previousState; 
 let stateIndex = 0;
 let state = [];
 
 
-//----- OPERATING FUNCTIONS -----//
+//----- OPERATING FUNCTIONS -----// 
 function preload() {
+  //Loads the fonts
   fontRegular = loadFont("Gotham-Light.otf");
   fontItalic = loadFont("Gotham-LightItalic.otf");
   fontBold = loadFont("Gotham-Bold.otf");
-  emoji = loadImage("laughing.png");
+  emoji = loadImage("laughing.png"); //Load the emoji image
 }
 
 function setup() {
-  //create different canvases
-  createCanvas(windowWidth, windowHeight);
-  drawingCanvas = createGraphics(windowWidth, windowHeight);
-  pickerCanvas = createGraphics(windowWidth, windowHeight)
-  welcome = createGraphics(windowWidth, windowHeight);
+  //create different canvases. 
+  createCanvas(windowWidth, windowHeight); // Main canvas displaying cursor and UI
+  drawingCanvas = createGraphics(windowWidth, windowHeight); //Drawing canvas
+  pickerCanvas = createGraphics(windowWidth, windowHeight) //Colour picker canvas so get(mouseX, mouseY) is unaffected by the cursor
+  welcome = createGraphics(windowWidth, windowHeight); //Welcome screen canvas
 
-  //Create individual colour picker circles
+  if (windowWidth <= 942) {
+    colour_qty = 5
+    sizeState = "small"
+  } else {
+    colour_qty = 7
+    sizeState = "large"
+  }
+  
+  //Create individual colour picker circle class
   for (i = 0; i < colour_qty; i++) {
     colour[i] = new colourPicker();
     colour[i].position(i - floor(colour_qty / 2));
   }
+  
+  
+  //Define colours
+  if (sizeState == "large") {
   colour[0].paintColour(0, 0, 0);
   colour[1].paintColour(54, 39, 6);
   colour[2].paintColour(70, 78, 46);
@@ -57,129 +71,130 @@ function setup() {
   colour[4].paintColour(57, 138, 185);
   colour[5].paintColour(28, 101, 140);
   colour[6].paintColour(233, 229, 214);
+  } else if (sizeState == "small") {
+  colour[0].paintColour(54, 39, 6);
+  colour[1].paintColour(70, 78, 46);
+  colour[2].paintColour(172, 185, 146);
+  colour[3].paintColour(57, 138, 185);
+  colour[4].paintColour(28, 101, 140);
+  }
+    
 
 
-  //Create individual weight picker
+  //Create individual weight picker class
   for (i = 1; i <= weight_qty; i++) {
     size[i] = new weightPicker();
     size[i].position(i - floor(weight_qty / 2) - 1);
     size[i].weight(i * 3 + 10);
   }
 
-  //Create single classes
+  //Create other classes
   clearDrawing = new clearDrawingClass();
   eraser = new eraserClass();
+  saveImg = new saveClass();
   drawShape = new drawShapeClass();
   emojiObject = new emojiClass();
   emojiCursor = new emojiClass();
   penButton = new penButtonClass();
 
-  //set default image mode to center
+  //Set default image mode to center
   imageMode(CENTER);
   drawingCanvas.imageMode(CENTER);
 
-  //Assigns first colour to pen
+  //Assigns middle colour to pen
   penColour = colour[floor(colour_qty / 2)].colour;
-
-  //Draws background
-  background(240);
-
 }
 
 function draw() {
-  //Draws background to update cursor image
+  //Draws background to update cursor
   background(240);
 
-  //Dispaly drawing canvas & hide cursor
+  //Dispaly drawing canvas & hides system cursor
   image(drawingCanvas, windowWidth / 2, windowHeight / 2);
   noCursor();
 
-  //Display welcome screen at start and displaty normal cursor
+  //Display welcome screen at start and displays system cursor
   if (welcomeState == true) {
     welcomeScreen();
     image(welcome, 0, 0);
     cursor();
   }
 
-  //Clear Drawing Button
-  clearDrawing.hover();
-  clearDrawing.display();
-
-  //Eraser Button
-  eraser.hover();
-  eraser.display();
-
-  //Draw other screen elements
+  //Calls all the different button functions to keep draw loop tidy
+  colourPickerBuild(); //Colour picker function
+  penSizeBuild(); //Pen size picker function
+  //Other Buttons
+  emojiButton();
+  drawPenButton();
+  clearButton();
+  eraserButton();
+  saveButton();
   drawShapeBuild();
-  colourPickerBuild();
-  penSizeBuild();
+  
+  buttonHoverCheck(); //Function used to check if any button's hover state is true
 
-  //Draw emoji
-  emojiObject.hover();
-  emojiObject.display(180, windowHeight - 50);
+  drawCursor(); //Draw cursor function
   
-  penButton.hover();
-  penButton.display();
-  
-  buttonHoverCheck();
-
-  image(pickerCanvas, windowWidth/2, windowHeight/2);
-  
-  drawCursor();
 }
 
 
 //----- EVENTS -----//
+//Main input events
 function keyPressed() {
-  //cycles through brush options
+  //Cycles through brush options
   if (welcomeState == false) {
     shapeRef = shapeRef + 1;
   }
-  //resets brush options
+  //Resets brush options
   if (shapeRef == 4) {
     shapeRef = 0;
   }
-  //hides welcome state
+  //Hides welcome state
   if (welcomeState == true) {
     welcomeState = false;
     penState = true;
     saveState();
   }
   
+// Undo button test currently not working
 //   if (keyCode === LEFT_ARROW) {
 //     undoToPreviousState();
 //   }
 }
 
 function mousePressed() {
-  //gets new colour from colour picker
+  //Gets new colour from colour picker canvas
   for (i = 0; i < colour_qty; i++) {
     if (colour[i].trigger == true) {
       penColour = pickerCanvas.get(mouseX, mouseY);
     }
   }
 
-  //gets pen size from size picker
+  //Gets pen size from size picker
   for (i = 1; i <= weight_qty; i++) {
     if (size[i].trigger == true) {
       penSize = size[i].penSize;
     }
   }
 
-  //re-draws background when clear button clicked
+  //Re-draws background when clear button clicked
   if (clearDrawing.trigger == true) {
     drawingCanvas.background(240);
   }
 
-  //enables eraser mode
+  //Enables eraser mode
   if (eraser.trigger == true) {
     penColour = 240;
     penState = true
     brushState = false
     emojiState = false
   }
+  
+  if (saveImg.trigger == true) {
+    saveCanvas(canvas,"Let's Draw!","png");
+  }
 
-  //toggles shape brush mode
+  //Toggles shape brush mode
   if (drawShape.trigger == true) {
     if (brushState == false) {
       brushState = true;
@@ -196,7 +211,7 @@ function mousePressed() {
   }
 
 
-  //toggles emoji sticker mode
+  //Toggles emoji sticker mode
   if (emojiObject.hoverTrigger == true) {
     if (emojiState == false) {
       emojiState = true;
@@ -211,6 +226,7 @@ function mousePressed() {
     }
   }
   
+  //Toggles pen mode
   if (penButton.trigger == true) {
     if (penState == false) {
       emojiState = false;
@@ -219,7 +235,7 @@ function mousePressed() {
     }
   }
   
-  //allows shapes to be clicked to paint
+  //Allows shapes to be clicked to paint
   if (brushState == true && buttonHoverState == false) {
     if (shapeRef == 0) {
       drawTriangledrawingCanvas(mouseX, mouseY);
@@ -232,10 +248,12 @@ function mousePressed() {
     }
   }
 
+  //Allows emoji to be clicked to paint
   if (emojiState == true && buttonHoverState == false) {
     emojiObject.displayCanvas(mouseX, mouseY);
   }
   
+  //Allows pen to be clicked to paint
   if (penState == true && buttonHoverState == false) {
     drawingCanvas.noStroke();
     drawingCanvas.fill(penColour);
@@ -245,6 +263,7 @@ function mousePressed() {
 
 function mouseDragged() {
   //Code sourced from https://editor.p5js.org/pierrep/sketches/mYSCwSBbi
+  //Pen draw setup
   if (penState == true) {
     drawingCanvas.strokeWeight(penSize-5);
     drawingCanvas.stroke(penColour);
@@ -258,6 +277,7 @@ function mouseDragged() {
         5
       );
     }
+    //Allows shape brush to be dragged to paint
   } else if (brushState == true) {
     if (shapeRef == 0) {
       drawTriangledrawingCanvas(mouseX, mouseY);
@@ -273,7 +293,9 @@ function mouseDragged() {
 
 
 //----- MAIN FUNCTIONS -----//
+//Functions used to clean up draw function
 function welcomeScreen() {
+  //Draws the welcome screen box
   fill(0);
   noStroke();
   rectMode(CENTER);
@@ -282,8 +304,8 @@ function welcomeScreen() {
     windowHeight / 2 - 38,
     windowWidth / 2 + 50,
     windowHeight / 4 + 80,
-    20
-  );
+    20);
+  //Writes the text for the welcome screen
   textSize(50);
   fill(255);
   textAlign(CENTER, CENTER);
@@ -305,6 +327,7 @@ function welcomeScreen() {
   textFont(fontItalic);
   text("Press any key to begin.", windowWidth / 2, windowHeight / 2 + 60);
   
+  //Sets initial button states to false
   if (welcomeState == true) {
     brushState = false;
     penState = false;
@@ -313,18 +336,21 @@ function welcomeScreen() {
 }
 
 function drawCursor() {
-  if (welcomeState == 0 && penState == true) {
+  //Draws two circles to get white outline effect on main canvas
+  if (welcomeState == 0 && penState == true) { //Only when there is no welcome screen
     noFill();
     strokeWeight(5);
     stroke(255);
     circle(mouseX, mouseY, penSize);
-    if (penColour == 240) {
+    if (penColour == 240) { //Checks to see if eraser is active
       stroke(0);
     } else {
       stroke(penColour);
     }
     strokeWeight(2);
     circle(mouseX, mouseY, penSize);
+    
+    //Draws the shape cursor
   } else if (brushState == true) {
     push();
     translate(mouseX, mouseY);
@@ -343,6 +369,7 @@ function drawCursor() {
       drawX(penSize, penColour);
     }
     pop();
+    //Draws the emoji cursor
   } else if (emojiState == true) {
     emojiCursor.display(mouseX, mouseY);
   }
@@ -366,6 +393,9 @@ function colourPickerBuild() {
     colour[i].hover();
     colour[i].display();
   }
+  
+  //Displays colour picker on pickerCanvas
+  image(pickerCanvas, windowWidth/2, windowHeight/2);
 }
 
 function penSizeBuild() {
@@ -374,6 +404,7 @@ function penSizeBuild() {
   noStroke();
   rectMode(CENTER);
   rect(width / 2, size[1].posY - 4, weight_qty * 45, 45, 20);
+  //Toggles hoverstate
   if (mouseX < width/2+((weight_qty*45)/2) && mouseX > width/2-((weight_qty*45)/2) && mouseY < ((size[1].posY - 4)+(45/2)) && mouseY > ((size[1].posY - 4)-(45/2))) {
       weightBoxHoverState = true;
   } else {
@@ -404,6 +435,7 @@ function penSizeBuild() {
 function drawShapeBuild() {
   drawShape.hover();
 
+  //A silly way to cycle through the different shapes on the shape brush...
   if (shapeRef == 0) {
     shapeVar = "triangle";
   }
@@ -423,17 +455,48 @@ function drawShapeBuild() {
 }
 
 function buttonHoverCheck() {
+  //Checks if any button has hoverstate true to disable painting
     if (colourBoxHoverState == true ||
         weightBoxHoverState == true ||
        clearDrawing.trigger == true ||
        drawShape.trigger == true ||
        eraser.trigger == true ||
+       saveImg.trigger == true ||
        emojiObject.hoverTrigger == true) {
       buttonHoverState = true;
     } else {
       buttonHoverState = false;
       }
     }
+
+function clearButton() {
+  //Runs the clear class to re-write the background. Doesn't need to be a class...
+    clearDrawing.hover();
+  clearDrawing.display();
+}
+
+function eraserButton() {
+  //Runs the eraser class to change brush colour to background
+  eraser.hover();
+  eraser.display();
+}
+
+function saveButton() {
+  saveImg.hover();
+  saveImg.display();
+}
+
+function emojiButton() {
+  //runs the emoji class
+    emojiObject.hover();
+  emojiObject.display(180, windowHeight - 50);
+}
+
+function drawPenButton() {
+  //runs the pen button class
+    penButton.hover();
+  penButton.display();
+}
 
 
 //----- CLASSES -----//
@@ -628,7 +691,7 @@ class drawShapeClass {
 
 class eraserClass {
   constructor() {
-    this.posX = windowWidth - 115;
+    this.posX = windowWidth - 180;
     this.posY = windowHeight - 50;
     this.size = 50;
     this.trigger = false;
@@ -653,6 +716,54 @@ class eraserClass {
     stroke(100);
     rectMode(CENTER);
     rect(0, 0, 25, 16, 2);
+    pop();
+
+    push();
+    translate(this.posX, this.posY);
+    stroke(100);
+    strokeWeight(5);
+    line(-12, 16, 12, 16);
+    pop();
+  }
+
+  hover() {
+    if (dist(mouseX, mouseY, this.posX, this.posY) <= this.size / 2) {
+      this.trigger = true;
+      //this.circleColour = 200;
+    } else {
+      this.trigger = false;
+      //this.circleColour = 220;
+    }
+  }
+}
+
+class saveClass {
+  constructor() {
+    this.posX = windowWidth - 115;
+    this.posY = windowHeight - 50;
+    this.size = 50;
+    this.trigger = false;
+    this.xSize = 10;
+    this.xWeight = 8;
+    this.circleColour = 0;
+  }
+
+  display() {
+    noStroke();
+    this.circleColour = 220;
+    if (penColour == 240 || this.trigger == true) {
+      this.circleColour = 200;
+    }
+    fill(this.circleColour);
+    circle(this.posX, this.posY, this.size);
+
+    push();
+    translate(this.posX, this.posY);
+    strokeWeight(this.xWeight);
+    stroke(100);
+    line(0, -10, 0, 13);
+    line(-10, 5, 0, 13);
+    line (10, 5, 0, 13);
     pop();
 
     push();
@@ -748,6 +859,8 @@ class penButtonClass {
 
 
 //----- SHAPE FUNCTIONS -----//
+//Handles the different shapes so they can be called anywhere in the program
+//Requires two versions to handle drawing canvas and buttons.
 function drawTriangle(weight, colour) {
   strokeWeight(weight - 10);
   stroke(colour);
@@ -823,6 +936,7 @@ function drawXdrawingCanvas(posX, posY) {
 
 
 //UNDO
+//Attempted to add an undo function but doesn't work reliably 
 function undoToPreviousState() {
   if (!state || !state.length || stateIndex === 0) {
     return;
@@ -834,9 +948,10 @@ function undoToPreviousState() {
   drawingCanvas.image(state[stateIndex], windowWidth/2, windowHeight/2);
 }
 
-// function mouseReleased() {
-//   saveState();
-// }
+//Comment this to turn it on.
+function mouseReleased() {
+  //saveState();
+}
 
 function saveState() {
   stateIndex++;
