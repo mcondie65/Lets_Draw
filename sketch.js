@@ -19,9 +19,15 @@ let brushState = false; //brush trigger state
 let emojiState = false; //emoji trigger state
 let colourBoxHoverState = false;
 let weightBoxHoverState = false;
-let buttonHoverState = false
+let buttonHoverState = false;
+let penState = true;
 
 let fontRegular, fontBold, fontItalic; //font import
+
+let previousState;
+
+let stateIndex = 0;
+let state = [];
 
 
 //----- OPERATING FUNCTIONS -----//
@@ -36,14 +42,22 @@ function setup() {
   //create different canvases
   createCanvas(windowWidth, windowHeight);
   drawingCanvas = createGraphics(windowWidth, windowHeight);
+  pickerCanvas = createGraphics(windowWidth, windowHeight)
   welcome = createGraphics(windowWidth, windowHeight);
 
   //Create individual colour picker circles
   for (i = 0; i < colour_qty; i++) {
     colour[i] = new colourPicker();
     colour[i].position(i - floor(colour_qty / 2));
-    colour[i].paintColour(random(0, 255), random(0, 255), random(0, 255));
   }
+  colour[0].paintColour(0, 0, 0);
+  colour[1].paintColour(54, 39, 6);
+  colour[2].paintColour(70, 78, 46);
+  colour[3].paintColour(172, 185, 146);
+  colour[4].paintColour(57, 138, 185);
+  colour[5].paintColour(28, 101, 140);
+  colour[6].paintColour(233, 229, 214);
+
 
   //Create individual weight picker
   for (i = 1; i <= weight_qty; i++) {
@@ -58,6 +72,7 @@ function setup() {
   drawShape = new drawShapeClass();
   emojiObject = new emojiClass();
   emojiCursor = new emojiClass();
+  penButton = new penButtonClass();
 
   //set default image mode to center
   imageMode(CENTER);
@@ -68,6 +83,7 @@ function setup() {
 
   //Draws background
   background(240);
+
 }
 
 function draw() {
@@ -100,11 +116,15 @@ function draw() {
 
   //Draw emoji
   emojiObject.hover();
-  emojiObject.display(115, windowHeight - 50);
+  emojiObject.display(180, windowHeight - 50);
+  
+  penButton.hover();
+  penButton.display();
   
   buttonHoverCheck();
 
-  //Circle Cursor
+  image(pickerCanvas, windowWidth/2, windowHeight/2);
+  
   drawCursor();
 }
 
@@ -122,14 +142,20 @@ function keyPressed() {
   //hides welcome state
   if (welcomeState == true) {
     welcomeState = false;
+    penState = true;
+    saveState();
   }
+  
+//   if (keyCode === LEFT_ARROW) {
+//     undoToPreviousState();
+//   }
 }
 
 function mousePressed() {
   //gets new colour from colour picker
   for (i = 0; i < colour_qty; i++) {
     if (colour[i].trigger == true) {
-      penColour = get(mouseX, mouseY);
+      penColour = pickerCanvas.get(mouseX, mouseY);
     }
   }
 
@@ -145,14 +171,12 @@ function mousePressed() {
     drawingCanvas.background(240);
   }
 
-  //enables shape brush mode
-  if (drawShape.trigger == true) {
-    drawShape.clicked(true);
-  }
-
   //enables eraser mode
   if (eraser.trigger == true) {
     penColour = 240;
+    penState = true
+    brushState = false
+    emojiState = false
   }
 
   //toggles shape brush mode
@@ -160,23 +184,43 @@ function mousePressed() {
     if (brushState == false) {
       brushState = true;
       emojiState = false;
+      penState = false;
+      if (penColour == 240) {
+        penColour = colour[floor(colour_qty / 2)].colour;
+      }
+      
     } else {
       brushState = false;
+      penState = true;
     }
   }
+
 
   //toggles emoji sticker mode
   if (emojiObject.hoverTrigger == true) {
     if (emojiState == false) {
       emojiState = true;
       brushState = false;
+      penState = false;
+            if (penColour == 240) {
+        penColour = colour[floor(colour_qty / 2)].colour;
+      }
     } else {
       emojiState = false;
+      penState = true;
     }
   }
-
+  
+  if (penButton.trigger == true) {
+    if (penState == false) {
+      emojiState = false;
+      brushState = false;
+      penState = true;
+    }
+  }
+  
   //allows shapes to be clicked to paint
-  if (welcomeState == 0 && brushState == true && buttonHoverState == false) {
+  if (brushState == true && buttonHoverState == false) {
     if (shapeRef == 0) {
       drawTriangledrawingCanvas(mouseX, mouseY);
     } else if (shapeRef == 1) {
@@ -188,19 +232,21 @@ function mousePressed() {
     }
   }
 
-  if (
-    welcomeState == 0 &&
-    emojiState == true &&
-    buttonHoverState == false
-  ) {
+  if (emojiState == true && buttonHoverState == false) {
     emojiObject.displayCanvas(mouseX, mouseY);
+  }
+  
+  if (penState == true && buttonHoverState == false) {
+    drawingCanvas.noStroke();
+    drawingCanvas.fill(penColour);
+    drawingCanvas.circle(mouseX, mouseY, penSize);
   }
 }
 
 function mouseDragged() {
   //Code sourced from https://editor.p5js.org/pierrep/sketches/mYSCwSBbi
-  if (welcomeState == 0 && brushState == false && emojiState == false) {
-    drawingCanvas.strokeWeight(penSize);
+  if (penState == true) {
+    drawingCanvas.strokeWeight(penSize-5);
     drawingCanvas.stroke(penColour);
     var destX = mouseX - pmouseX;
     var destY = mouseY - pmouseY;
@@ -212,7 +258,7 @@ function mouseDragged() {
         5
       );
     }
-  } else if (welcomeState == 0 && brushState == true && emojiState == false) {
+  } else if (brushState == true) {
     if (shapeRef == 0) {
       drawTriangledrawingCanvas(mouseX, mouseY);
     } else if (shapeRef == 1) {
@@ -245,24 +291,33 @@ function welcomeScreen() {
   text("LET'S DRAW!", windowWidth / 2, windowHeight / 2 - 120);
   textSize(20);
   textFont(fontRegular);
-  text("Click and drag to draw", windowWidth / 2, windowHeight / 2 - 60);
+  text("Choose your drawing tool", windowWidth / 2, windowHeight / 2 - 60);
   text(
     "Press any key to change brush shape",
     windowWidth / 2,
     windowHeight / 2 - 30
   );
   text(
-    "Click brush or sticker button to toggle",
+    "Click and drag to draw.",
     windowWidth / 2,
     windowHeight / 2
   );
   textFont(fontItalic);
-  text("Press any key to begin", windowWidth / 2, windowHeight / 2 + 60);
+  text("Press any key to begin.", windowWidth / 2, windowHeight / 2 + 60);
+  
+  if (welcomeState == true) {
+    brushState = false;
+    penState = false;
+    emojiState = false;
+  }
 }
 
 function drawCursor() {
-  if (welcomeState == 0 && brushState == false && emojiState == false) {
+  if (welcomeState == 0 && penState == true) {
     noFill();
+    strokeWeight(5);
+    stroke(255);
+    circle(mouseX, mouseY, penSize);
     if (penColour == 240) {
       stroke(0);
     } else {
@@ -270,31 +325,35 @@ function drawCursor() {
     }
     strokeWeight(2);
     circle(mouseX, mouseY, penSize);
-  } else if (brushState == true && emojiState == false) {
+  } else if (brushState == true) {
     push();
     translate(mouseX, mouseY);
 
     if (welcomeState == 0 && shapeRef == 0) {
-      drawTriangle();
+      drawTriangle(penSize+5, 'white');
+      drawTriangle(penSize, penColour);
     } else if (shapeRef == 1) {
-      drawSquare();
+      drawSquare(penSize+5, 'white');
+      drawSquare(penSize, penColour);
     } else if (shapeRef == 2) {
-      drawCircle();
+      drawCircle(penSize+5, 'white')
+      drawCircle(penSize, penColour);
     } else if (shapeRef == 3) {
-      drawX();
+      drawX(penSize+5, 'white');
+      drawX(penSize, penColour);
     }
     pop();
-  } else if (brushState == false && emojiState == true) {
+  } else if (emojiState == true) {
     emojiCursor.display(mouseX, mouseY);
   }
 }
 
 function colourPickerBuild() {
   //Draw white box behind colour picker
-  fill("white");
-  noStroke();
-  rectMode(CENTER);
-  rect(width / 2, colour[0].posY, colour_qty * 75, 75, 20);
+  pickerCanvas.fill(255);
+  pickerCanvas.noStroke();
+  pickerCanvas.rectMode(CENTER);
+  pickerCanvas.rect(width / 2, colour[0].posY, colour_qty * 75, 75, 20);
   if (mouseX < width/2+((colour_qty*75)/2) && mouseX > width/2-((colour_qty*75)/2) && mouseY > colour[0].posY-(75/2) && mouseY < colour[0].posY+(75/2)) {
       colourBoxHoverState = true
       } else {
@@ -359,7 +418,7 @@ function drawShapeBuild() {
   }
 
   drawShape.shapeSelect(shapeVar);
-  drawShape.clicked();
+  drawShape.hover();
   drawShape.display();
 }
 
@@ -388,8 +447,9 @@ class colourPicker {
   }
 
   display() {
-    fill(this.colour);
-    circle(this.posX, this.posY, this.size);
+    pickerCanvas.fill(this.colour);
+    pickerCanvas.noStroke();
+    pickerCanvas.circle(this.posX, this.posY, this.size);
   }
 
   paintColour(r, g, b) {
@@ -504,7 +564,7 @@ class clearDrawingClass {
 
 class drawShapeClass {
   constructor() {
-    this.posX = 50;
+    this.posX = 115;
     this.posY = windowHeight - 50;
     this.size = 50;
     this.trigger = true;
@@ -516,6 +576,12 @@ class drawShapeClass {
   }
 
   display() {
+    if (this.trigger == true || brushState == true) {
+      this.circleColour = 200;
+    } else {
+      this.circleColour = 220;
+    }
+    
     noStroke();
     fill(this.circleColour);
     circle(this.posX, this.posY, this.size);
@@ -523,22 +589,11 @@ class drawShapeClass {
     this.drawShape();
   }
 
-  clicked() {
-    if (brushState == false) {
-      this.circleColour = 220;
-    }
-    if (brushState == true) {
-      this.circleColour = 200;
-    }
-  }
-
   hover() {
     if (dist(mouseX, mouseY, this.posX, this.posY) <= this.size / 2) {
       this.trigger = true;
-      this.circleColour = 200;
     } else {
       this.trigger = false;
-      this.circleColour = 220;
     }
   }
 
@@ -550,22 +605,22 @@ class drawShapeClass {
     if (this.shape == "square") {
       push();
       translate(this.posX, this.posY);
-      drawSquare();
+      drawSquare(penSize, penColour);
       pop();
     } else if (this.shape == "x") {
       push();
       translate(this.posX, this.posY);
-      drawX();
+      drawX(penSize, penColour);
       pop();
     } else if (this.shape == "circle") {
       push();
       translate(this.posX, this.posY);
-      drawCircle();
+      drawCircle(penSize, penColour);
       pop();
     } else if (this.shape == "triangle") {
       push();
       translate(this.posX, this.posY);
-      drawTriangle();
+      drawTriangle(penSize, penColour);
       pop();
     }
   }
@@ -650,32 +705,73 @@ class emojiClass {
   }
 }
 
+class penButtonClass {
+  constructor() {
+    this.posX = 50;
+    this.posY = windowHeight - 50;
+    this.size = 50;
+    this.trigger = true;
+    this.clickedState = false;
+    this.circleColour = 0;
+  }
+
+  display() {
+    if (this.trigger == true || penState == true) {
+      this.circleColour = 200;
+    } else {
+      this.circleColour = 220;
+    }
+    
+    noStroke();
+    fill(this.circleColour);
+    circle(this.posX, this.posY, this.size);
+    
+    strokeWeight(2);
+    stroke(penColour);
+    if (penState == true) {
+      fill(penColour);
+    } else {
+      noFill();
+    }
+    circle(this.posX, this.posY, penSize)
+
+  }
+
+  hover() {
+    if (dist(mouseX, mouseY, this.posX, this.posY) <= this.size / 2) {
+      this.trigger = true;
+    } else {
+      this.trigger = false;
+    }
+  }
+}
+
 
 //----- SHAPE FUNCTIONS -----//
-function drawTriangle() {
-  strokeWeight(penSize - 10);
-  stroke(penColour);
+function drawTriangle(weight, colour) {
+  strokeWeight(weight - 10);
+  stroke(colour);
   let lineLength = 12;
   line(-lineLength, lineLength, lineLength, lineLength);
   line(lineLength, lineLength, 0, -lineLength);
   line(0, -lineLength, -lineLength, lineLength);
 }
-function drawCircle() {
-  strokeWeight(penSize - 10);
+function drawCircle(weight, colour) {
+  strokeWeight(weight - 10);
   noFill();
-  stroke(penColour);
+  stroke(colour);
   circle(0, 0, 25);
 }
-function drawSquare() {
-  strokeWeight(penSize - 10);
-  stroke(penColour);
+function drawSquare(weight, colour) {
+  strokeWeight(weight - 10);
+  stroke(colour);
   noFill();
   rectMode(CENTER);
   square(0, 0, 25, 1);
 }
-function drawX() {
-  strokeWeight(penSize - 10);
-  stroke(penColour);
+function drawX(weight, colour) {
+  strokeWeight(weight - 10);
+  stroke(colour);
   line(-10, 10, 10, -10);
   line(10, 10, -10, -10);
 }
@@ -722,3 +818,30 @@ function drawXdrawingCanvas(posX, posY) {
   drawingCanvas.line(posX - 10, posY + 10, posX + 10, posY - 10);
   drawingCanvas.line(posX + 10, posY + 10, posX - 10, posY - 10);
 }
+
+
+
+
+//UNDO
+function undoToPreviousState() {
+  if (!state || !state.length || stateIndex === 0) {
+    return;
+  }
+
+  stateIndex--;
+  
+  //drawingCanvas.background(200);
+  drawingCanvas.image(state[stateIndex], windowWidth/2, windowHeight/2);
+}
+
+// function mouseReleased() {
+//   saveState();
+// }
+
+function saveState() {
+  stateIndex++;
+
+  drawingCanvas.loadPixels();
+  state.push(get())
+}
+
